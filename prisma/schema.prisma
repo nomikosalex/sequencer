@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Contact {
+  id          String         @id @default(cuid())
+  name        String
+  email       String         @unique
+  company     String
+  linkedinUrl String?
+  title       String?        // e.g. "CEO", "Head of Growth"
+  leadScore   Int            @default(0)
+  status      String         @default("active")
+  // active = in sequence
+  // replied = got response (auto-stop)
+  // bounced = email bounced
+  // completed = sequence finished, no reply
+  hubspotId   String?        // HubSpot contact ID after sync
+  pipelineStage String       @default("target")
+  // target = not contacted yet
+  // contacted = at least one sequence step sent
+  // replied = contact replied
+  // call_booked = manually marked, or dragged in dashboard kanban
+  // offer = dragged in dashboard kanban
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  steps       SequenceStep[]
+}
+
+model Sequence {
+  id          String             @id @default(cuid())
+  name        String             // e.g. "GTM Internship Outreach"
+  description String?
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  templates   SequenceTemplate[]
+  steps       SequenceStep[]
+}
+
+model SequenceTemplate {
+  id          String   @id @default(cuid())
+  sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  sequenceId  String
+  stepNumber  Int      // 1, 2, 3...
+  delayDays   Int      // days after previous step (step 1 = days after enrollment)
+  subject     String   // supports {{name}}, {{company}}, {{title}}
+  body        String   // supports {{name}}, {{company}}, {{title}}, {{portfolioLink}}
+  createdAt   DateTime @default(now())
+
+  @@unique([sequenceId, stepNumber])
+}
+
+model SequenceStep {
+  id          String    @id @default(cuid())
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contactId   String
+  sequence    Sequence  @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  sequenceId  String
+  stepNumber  Int
+  subject     String    // rendered (variables replaced)
+  body        String    // rendered (variables replaced)
+  sendAt      DateTime  // calculated: enrollment date + sum of delayDays
+  sentAt      DateTime? // null = not sent yet
+  openedAt    DateTime? // set by Mailgun webhook
+  clickedAt   DateTime? // set by Mailgun webhook
+  repliedAt   DateTime? // set by Mailgun webhook
+  status      String    @default("pending")
+  // pending = waiting to send
+  // sent = delivered
+  // opened = recipient opened
+  // replied = recipient replied (triggers auto-stop)
+  // skipped = skipped because contact replied to earlier step
+  // failed = send failed
+  mailgunId   String?   // Mailgun message ID for tracking
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([contactId, sequenceId, stepNumber])
+}
+
+model HubSpotSync {
+  id          String   @id @default(cuid())
+  entityType  String   // "contact", "deal", "email"
+  entityId    String   // local ID
+  hubspotId   String   // HubSpot ID
+  lastSynced  DateTime @default(now())
+}
