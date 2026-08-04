@@ -7,13 +7,14 @@ const CONSTANTS = {
 
 export function renderTemplate(
   template: string,
-  contact: Pick<Contact, "name" | "company" | "title">
+  contact: Pick<Contact, "name" | "company" | "title" | "customLine">
 ): string {
   return template
     .replace(/\{\{name\}\}/g, contact.name.split(" ")[0])
     .replace(/\{\{fullName\}\}/g, contact.name)
     .replace(/\{\{company\}\}/g, contact.company)
     .replace(/\{\{title\}\}/g, contact.title || "")
+    .replace(/\{\{customLine\}\}/g, contact.customLine || "")
     .replace(/\{\{portfolioLink\}\}/g, CONSTANTS.portfolioLink)
     .replace(/\{\{githubLink\}\}/g, CONSTANTS.githubLink);
 }

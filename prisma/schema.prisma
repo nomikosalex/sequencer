@@ -27,6 +27,7 @@ model Contact {
   // call_booked = manually marked, or dragged in dashboard kanban
   // offer = dragged in dashboard kanban
   notes       String?
+  customLine  String?        // personalized opening line for outreach
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   steps       SequenceStep[]

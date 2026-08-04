@@ -120,7 +120,7 @@ export default function NewSequencePage() {
               Steps
             </h2>
             <span className="text-xs text-foreground/50">
-              Variables: {"{{name}} {{fullName}} {{company}} {{title}} {{portfolioLink}} {{githubLink}}"}
+              Variables: {"{{name}} {{fullName}} {{company}} {{title}} {{customLine}} {{portfolioLink}} {{githubLink}}"}
             </span>
           </div>
 

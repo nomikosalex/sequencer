@@ -27,6 +27,7 @@ export default function ContactActions({ contact }: { contact: Contact }) {
       leadScore: Number(form.get("leadScore")),
       status: form.get("status"),
       notes: form.get("notes") || null,
+      customLine: form.get("customLine") || null,
     };
 
     const res = await fetch(`/api/contacts/${contact.id}`, {
@@ -82,6 +83,20 @@ export default function ContactActions({ contact }: { contact: Contact }) {
         <Field label="Title" name="title" defaultValue={contact.title ?? ""} />
         <Field label="LinkedIn URL" name="linkedinUrl" type="url" defaultValue={contact.linkedinUrl ?? ""} />
         <Field label="Lead score" name="leadScore" type="number" defaultValue={String(contact.leadScore)} />
+
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium" htmlFor="customLine">
+            Custom opening line
+          </label>
+          <textarea
+            id="customLine"
+            name="customLine"
+            rows={2}
+            defaultValue={contact.customLine ?? ""}
+            placeholder="Personalized first line for this contact's outreach — use {{customLine}} in a sequence step"
+            className="rounded-md border border-black/10 dark:border-white/10 bg-transparent px-3 py-1.5 text-sm"
+          />
+        </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium" htmlFor="status">Status</label>
@@ -154,6 +169,8 @@ export default function ContactActions({ contact }: { contact: Contact }) {
         </dd>
         <dt className="text-foreground/60">Lead score</dt>
         <dd>{contact.leadScore}</dd>
+        <dt className="text-foreground/60">Custom line</dt>
+        <dd className="whitespace-pre-wrap">{contact.customLine ?? "—"}</dd>
         <dt className="text-foreground/60">Status</dt>
         <dd>{contact.status}</dd>
         <dt className="text-foreground/60">Notes</dt>

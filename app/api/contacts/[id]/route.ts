@@ -32,6 +32,7 @@ export async function PATCH(
     leadScore,
     status,
     notes,
+    customLine,
     pipelineStage,
   } = body;
 
@@ -51,6 +52,7 @@ export async function PATCH(
         ...(leadScore !== undefined ? { leadScore } : {}),
         ...(status !== undefined ? { status } : {}),
         ...(notes !== undefined ? { notes: notes || null } : {}),
+        ...(customLine !== undefined ? { customLine: customLine || null } : {}),
       },
     });
 

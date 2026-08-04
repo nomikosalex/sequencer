@@ -75,6 +75,7 @@ model Contact {
   // is its own local field/slug set — decoupled from HubSpot's portal-specific
   // internal stage ids so the dashboard kanban works even without HubSpot configured.
   notes       String?
+  customLine  String?        // personalized opening line for outreach, different per contact
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   steps       SequenceStep[]
@@ -292,6 +293,7 @@ Available in subject and body fields:
 | {{fullName}} | Contact full name |
 | {{company}} | Contact company name |
 | {{title}} | Contact job title |
+| {{customLine}} | Personalized opening line, set per contact on the edit page |
 | {{portfolioLink}} | Notion portfolio URL (constant) |
 | {{githubLink}} | GitHub profile URL (constant) |
 
@@ -574,3 +576,6 @@ Track these weekly in the dashboard:
 | 2026-07-31 | Added `Contact.pipelineStage` field (target/contacted/replied/call_booked/offer, default "target") | The Day 5 dashboard kanban (Target → Contacted → Replied → Call Booked → Offer) needs a local field to render/drag — nothing in the original schema tracked deal-pipeline position, only `Contact.status` (a different concept: sequence lifecycle, not deal stage). Kept as local slugs decoupled from HubSpot's portal-specific stage ids so the kanban still works with HubSpot unconfigured. |
 | 2026-07-31 | Added `SequenceStep.updatedAt` (`@updatedAt`) | The Day 5 dashboard "recent activity feed" needs to sort by when a step was last touched (sent/opened/clicked/replied/failed). The original schema only had `createdAt`, set at enrollment time — sorting by that would show newly-enrolled steps, not recent events. |
 | 2026-08-02 | Added `"postinstall": "prisma generate"` to `package.json` | First Vercel deploy failed the build (`Module "@prisma/client" has no exported member 'Prisma'`) — locally the client had always been generated manually via `npx prisma generate`/`migrate dev`, but Vercel's `npm install` doesn't run that on its own, so the deployed build had an empty, ungenerated client. |
+| 2026-08-02 | Added `.vercelignore` (excludes `.env`, `.env.local`, etc.) | `vercel deploy`'s upload does not reliably honor `.gitignore` the way `git` does — the first production deploy included the real `.env` (all secrets in plaintext) in its source bundle. Not publicly web-accessible, but not acceptable either. Redeployed clean and deleted the old deployment via `vercel remove` to purge it from Vercel's storage. |
+| 2026-08-04 | Switched `MAILGUN_DOMAIN`/`MAILGUN_FROM` from the sandbox domain to the verified `alexnomikos.com` custom domain; added the real `MAILGUN_WEBHOOK_SIGNING_KEY` | Domain was DNS-verified in Mailgun (user's own setup, confirmed via `GET /v4/domains` → `state: active`) per the "Domain Setup for Cold Email" section below. Verified with a real send+delivery to a personal inbox before touching Vercel, then updated Vercel env vars and redeployed. Registered all 6 webhook event types (delivered/opened/clicked/unsubscribed/complained/permanent_fail) via the Mailgun API pointing at the production `/api/webhooks/mailgun` URL, and confirmed via Vercel's runtime logs that real incoming Mailgun webhook calls return 200 (signature verification passing) rather than the previous fail-closed 401. |
+| 2026-08-04 | Added `Contact.customLine` field + `{{customLine}}` template variable | Per-contact personalized opening line for outreach emails — every other template variable is either a fixed contact field (name/company/title) or a global constant; this is the one that needs to be hand-written per contact before enrollment. |
