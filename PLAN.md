@@ -120,11 +120,14 @@ model SequenceStep {
   repliedAt   DateTime? // set by Mailgun webhook
   status      String    @default("pending")
   // pending = waiting to send
-  // sent = delivered
-  // opened = recipient opened
+  // sending = transient: atomically claimed by /api/send, about to call Mailgun
+  //           (prevents a duplicate cron invocation from double-sending)
+  // sent = Mailgun API accepted the send request (does NOT mean delivered — see "delivered")
+  // delivered = Mailgun's `delivered` webhook confirmed actual delivery to the recipient's server
+  // opened = recipient opened (webhook), can arrive from "sent" or "delivered"
   // replied = recipient replied (triggers auto-stop)
   // skipped = skipped because contact replied to earlier step
-  // failed = send failed
+  // failed = send failed, or Mailgun's `failed` webhook reported a bounce
   mailgunId   String?   // Mailgun message ID for tracking
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt // used to sort the dashboard's recent activity feed
@@ -242,12 +245,19 @@ model HubSpotSync {
 - ⚠️ Vercel cron delivery is best-effort, not exactly-once — the same scheduled run can occasionally fire twice.
   `/api/send` atomically claims each step (`pending` → `sending` via a conditional `updateMany`) before calling
   Mailgun, so a duplicate invocation can't email the same contact twice.
+- **Send jitter (deliverability):** a random 5-30s delay is inserted between consecutive sends within a single
+  `/api/send` run (not before the first one) so a batch doesn't fire in a multi-second burst — bursty sending from
+  a low-reputation/new domain is a strong spam signal. `export const maxDuration = 300` (Hobby's max/default with
+  fluid compute) is set explicitly on the route; if a large batch wouldn't fit in the time budget, remaining steps
+  are simply left `pending` (untouched, still claimable) and picked up by the next day's cron run rather than risking
+  the function being killed mid-send.
 
 ### 5. Webhook Handler (Mailgun Events)
 - Endpoint: /api/webhooks/mailgun
 - Verify Mailgun webhook signature (IMPORTANT for security)
 - Handle events:
-  - `delivered` → update step status to "sent" (confirm delivery)
+  - `delivered` → update step status from "sent" to "delivered" (distinct from "sent" = API-accepted;
+    see status enum comment on `SequenceStep.status` in the schema above)
   - `opened` → update step openedAt = now
   - `clicked` → update step clickedAt = now
   - `complained` or `unsubscribed` → contact.status = "unsubscribed", skip remaining

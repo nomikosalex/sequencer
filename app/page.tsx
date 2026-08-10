@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const ACTIVITY_VERB: Record<string, string> = {
   sent: "Email sent to",
+  delivered: "Delivered to",
   opened: "Opened by",
   replied: "Reply from",
   failed: "Failed to send to",
@@ -32,7 +33,7 @@ export default async function Home() {
       orderBy: { leadScore: "desc" },
     }),
     prisma.sequenceStep.findMany({
-      where: { status: { in: ["sent", "opened", "replied", "failed"] } },
+      where: { status: { in: ["sent", "delivered", "opened", "replied", "failed"] } },
       orderBy: { updatedAt: "desc" },
       take: 15,
       include: { contact: true, sequence: true },

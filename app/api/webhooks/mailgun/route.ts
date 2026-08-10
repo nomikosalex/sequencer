@@ -9,6 +9,30 @@ function normalizeMessageId(id: string): string {
   return id.replace(/^</, "").replace(/>$/, "");
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Mailgun can fire a `delivered` webhook within ~1s of the send call resolving,
+// which can race our own /api/send write of `mailgunId` to the step row (that
+// write only starts after Mailgun's API response comes back, and can take longer
+// than expected on a cold serverless->DB connection). Unlike other event types,
+// `delivered` webhooks are NOT retried by Mailgun on a non-200 response, so if we
+// give up on the first miss, the delivered event is lost for good. Retry the
+// lookup briefly instead of failing fast.
+async function findStepByMessageId(messageId: string) {
+  const attempts = 6;
+  const delayMs = 500;
+  for (let i = 0; i < attempts; i++) {
+    const step = await prisma.sequenceStep.findFirst({
+      where: { mailgunId: { contains: messageId } },
+    });
+    if (step) return step;
+    if (i < attempts - 1) await sleep(delayMs);
+  }
+  return null;
+}
+
 async function skipRemainingSteps(contactId: string) {
   await prisma.sequenceStep.updateMany({
     where: { contactId, status: "pending" },
@@ -24,16 +48,14 @@ async function handleTrackingEvent(eventData: Record<string, unknown>) {
 
   const messageId = normalizeMessageId(rawMessageId);
 
-  const step = await prisma.sequenceStep.findFirst({
-    where: { mailgunId: { contains: messageId } },
-  });
+  const step = await findStepByMessageId(messageId);
   if (!step) return;
 
   switch (event) {
     case "delivered": {
       await prisma.sequenceStep.update({
         where: { id: step.id },
-        data: { status: "sent" },
+        data: { status: step.status === "sent" ? "delivered" : step.status },
       });
       break;
     }
@@ -42,7 +64,7 @@ async function handleTrackingEvent(eventData: Record<string, unknown>) {
         where: { id: step.id },
         data: {
           openedAt: step.openedAt ?? new Date(),
-          status: step.status === "sent" ? "opened" : step.status,
+          status: ["sent", "delivered"].includes(step.status) ? "opened" : step.status,
         },
       });
       break;
@@ -91,7 +113,7 @@ async function handleInboundReply(inbound: Record<string, string>) {
   if (!contact) return;
 
   const lastSentStep = await prisma.sequenceStep.findFirst({
-    where: { contactId: contact.id, status: { in: ["sent", "opened"] } },
+    where: { contactId: contact.id, status: { in: ["sent", "delivered", "opened"] } },
     orderBy: { sentAt: "desc" },
   });
 
