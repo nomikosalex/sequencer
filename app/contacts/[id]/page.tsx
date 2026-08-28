@@ -34,7 +34,10 @@ export default async function ContactDetailPage({
         <h1 className="text-2xl font-semibold tracking-tight">{contact.name}</h1>
       </div>
 
-      <ContactActions contact={contact} />
+      <ContactActions
+        contact={contact}
+        pendingCount={contact.steps.filter((s) => s.status === "pending").length}
+      />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold text-foreground/60 uppercase tracking-wide">

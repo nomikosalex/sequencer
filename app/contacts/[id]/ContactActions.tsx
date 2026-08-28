@@ -4,13 +4,59 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Contact } from "@prisma/client";
 
-const STATUS_OPTIONS = ["active", "replied", "bounced", "completed", "unsubscribed"];
+const STATUS_OPTIONS = ["active", "paused", "replied", "bounced", "completed", "unsubscribed"];
 
-export default function ContactActions({ contact }: { contact: Contact }) {
+export default function ContactActions({
+  contact,
+  pendingCount = 0,
+}: {
+  contact: Contact;
+  pendingCount?: number;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const paused = contact.status === "paused";
+  const stoppable = pendingCount > 0;
+
+  async function togglePause() {
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/contacts/${contact.id}/pause`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paused: !paused }),
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Couldn't change this contact. Try again.");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function handleStopContact() {
+    if (
+      !confirm(
+        `Stop outreach to ${contact.name}? This cancels ${pendingCount} scheduled ` +
+          `${pendingCount === 1 ? "email" : "emails"} permanently. To hold them instead, use Pause.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/contacts/${contact.id}/stop`, { method: "POST" });
+    setBusy(false);
+    if (!res.ok) {
+      setError("Couldn't stop outreach. Try again.");
+      return;
+    }
+    router.refresh();
+  }
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -177,12 +223,39 @@ export default function ContactActions({ contact }: { contact: Contact }) {
         <dd className="whitespace-pre-wrap">{contact.notes ?? "—"}</dd>
       </dl>
 
-      <div className="flex gap-2 pt-2">
+      {paused && (
+        <div className="rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 px-3 py-2 text-sm">
+          Paused
+          {pendingCount > 0
+            ? ` — ${pendingCount} scheduled ${pendingCount === 1 ? "email is" : "emails are"} being held.`
+            : " — nothing scheduled."}{" "}
+          Resume to continue, or Stop to cancel.
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 pt-2">
         <button
           onClick={() => setEditing(true)}
           className="rounded-md border border-black/10 dark:border-white/10 px-3 py-1.5 text-sm font-medium hover:bg-black/[.04] dark:hover:bg-white/[.06]"
         >
           Edit
+        </button>
+        {(contact.status === "active" || paused) && (
+          <button
+            onClick={togglePause}
+            disabled={busy}
+            className="rounded-md border border-black/10 dark:border-white/10 px-3 py-1.5 text-sm font-medium hover:bg-black/[.04] dark:hover:bg-white/[.06] disabled:opacity-50"
+          >
+            {paused ? "Resume" : "Pause"}
+          </button>
+        )}
+        <button
+          onClick={handleStopContact}
+          disabled={busy || !stoppable}
+          title={stoppable ? undefined : "Nothing scheduled to cancel"}
+          className="rounded-md border border-black/10 dark:border-white/10 px-3 py-1.5 text-sm font-medium hover:bg-black/[.04] dark:hover:bg-white/[.06] disabled:opacity-50"
+        >
+          Stop
         </button>
         {contact.hubspotId && (
           <button
