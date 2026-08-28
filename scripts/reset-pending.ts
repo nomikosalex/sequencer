@@ -11,9 +11,16 @@
  * Only touches status = "pending". Sent, replied and skipped history is left
  * alone.
  */
+// dotenv first: this runs outside Next.js, which would otherwise load .env for us.
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-const prisma = new PrismaClient();
+// Same driver-adapter setup as lib/prisma.ts — Prisma 7 refuses to connect
+// without one.
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 
 async function main() {
   const confirmed = process.argv.includes("--confirm");
