@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyMailgunSignature } from "@/lib/mailgun";
 import { setPipelineStage } from "@/lib/hubspotSync";
+import { skipRemainingSteps } from "@/lib/sequenceControl";
 
 type MailgunSignature = { timestamp: string; token: string; signature: string };
 
@@ -31,13 +32,6 @@ async function findStepByMessageId(messageId: string) {
     if (i < attempts - 1) await sleep(delayMs);
   }
   return null;
-}
-
-async function skipRemainingSteps(contactId: string) {
-  await prisma.sequenceStep.updateMany({
-    where: { contactId, status: "pending" },
-    data: { status: "skipped" },
-  });
 }
 
 async function handleTrackingEvent(eventData: Record<string, unknown>) {

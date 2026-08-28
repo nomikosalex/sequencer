@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import PipelineKanban from "@/app/components/PipelineKanban";
+import SendingSwitch from "@/app/components/SendingSwitch";
+import { isSendingPaused } from "@/lib/sequenceControl";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +60,14 @@ export default async function Home() {
     { label: "Reply rate", value: `${replyRate}%` },
   ];
 
+  const sendingPaused = await isSendingPaused();
+
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+        <SendingSwitch paused={sendingPaused} />
+      </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {stats.map((stat) => (

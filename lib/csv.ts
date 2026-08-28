@@ -52,6 +52,12 @@ const COLUMN_ALIASES: Record<string, string> = {
   linkedin: "linkedinUrl",
   linkedinurl: "linkedinUrl",
   title: "title",
+  // Without these the enroll guard would reject every imported contact, since
+  // there was previously no way to supply a custom line in bulk.
+  customline: "customLine",
+  "custom line": "customLine",
+  city: "city",
+  timezone: "timezone",
 };
 
 export type ParsedContactRow = {
@@ -60,6 +66,9 @@ export type ParsedContactRow = {
   company?: string;
   linkedinUrl?: string;
   title?: string;
+  customLine?: string;
+  city?: string;
+  timezone?: string;
 };
 
 export function csvToContactRows(text: string): ParsedContactRow[] {

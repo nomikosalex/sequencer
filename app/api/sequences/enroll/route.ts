@@ -43,6 +43,15 @@ export async function POST(request: NextRequest) {
   });
   const alreadyEnrolled = new Set(existingSteps.map((s) => s.contactId));
 
+  // Rendering happens once, here, and is frozen into the step rows — so a
+  // contact missing its personalisation line would silently ship a generic
+  // email, and fixing the template afterwards would not repair it. Refuse the
+  // enrollment instead. Gated on the template actually using the variable, so
+  // sequences that do not personalise still enroll normally.
+  const needsCustomLine = sequence.templates.some((t) =>
+    /\{\{customLine\}\}/.test(`${t.subject}${t.body}`)
+  );
+
   let enrolled = 0;
   const skipped: { contactId: string; reason: string }[] = [];
   const now = Date.now();
@@ -55,6 +64,13 @@ export async function POST(request: NextRequest) {
     }
     if (alreadyEnrolled.has(contactId)) {
       skipped.push({ contactId, reason: "Already enrolled in this sequence" });
+      continue;
+    }
+    if (needsCustomLine && !contact.customLine?.trim()) {
+      skipped.push({
+        contactId,
+        reason: "Missing customLine — personalisation would render blank",
+      });
       continue;
     }
 

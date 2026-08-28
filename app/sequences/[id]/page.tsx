@@ -81,7 +81,10 @@ export default async function SequenceDetailPage({
           <p className="text-sm text-foreground/70">{sequence.description}</p>
         )}
         <div className="flex items-center justify-between">
-          <SequenceActions sequence={sequence} />
+          <SequenceActions
+            sequence={sequence}
+            pendingCount={sequence.steps.filter((s) => s.status === "pending").length}
+          />
           <Link
             href={`/sequences/${sequence.id}/enroll`}
             className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:opacity-90"

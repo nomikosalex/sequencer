@@ -28,9 +28,20 @@ model Contact {
   // offer = dragged in dashboard kanban
   notes       String?
   customLine  String?        // personalized opening line for outreach
+  city        String?        // free text, e.g. "Berlin" — used to derive timezone
+  timezone    String?        // IANA, e.g. "Europe/Berlin". Null falls back to DEFAULT_TIMEZONE.
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   steps       SequenceStep[]
+}
+
+// Runtime switches that must take effect without a redeploy. The emergency
+// "stop everything" needs to work the moment it is flipped, which an env var
+// cannot do.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 model Sequence {

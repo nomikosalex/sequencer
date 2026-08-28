@@ -9,8 +9,11 @@ export function renderTemplate(
   template: string,
   contact: Pick<Contact, "name" | "company" | "title" | "customLine">
 ): string {
+  // An empty name would otherwise render "Hi ," — worse than no greeting.
+  const firstName = contact.name?.trim().split(" ")[0] || "there";
+
   return template
-    .replace(/\{\{name\}\}/g, contact.name.split(" ")[0])
+    .replace(/\{\{name\}\}/g, firstName)
     .replace(/\{\{fullName\}\}/g, contact.name)
     .replace(/\{\{company\}\}/g, contact.company)
     .replace(/\{\{title\}\}/g, contact.title || "")

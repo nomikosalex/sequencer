@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { syncContactToHubspot } from "@/lib/hubspotSync";
+import { timezoneForCity } from "@/lib/timezone";
 
 type ImportRow = {
   name?: string;
@@ -9,6 +10,9 @@ type ImportRow = {
   company?: string;
   linkedinUrl?: string;
   title?: string;
+  customLine?: string;
+  city?: string;
+  timezone?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -35,6 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      const city = row.city?.trim() || null;
       const contact = await prisma.contact.create({
         data: {
           name,
@@ -42,6 +47,11 @@ export async function POST(request: NextRequest) {
           company,
           linkedinUrl: row.linkedinUrl?.trim() || null,
           title: row.title?.trim() || null,
+          customLine: row.customLine?.trim() || null,
+          city,
+          // An explicit timezone column wins; otherwise derive it from the city
+          // so the target-list export works without extra columns.
+          timezone: row.timezone?.trim() || timezoneForCity(city),
         },
       });
       await syncContactToHubspot(contact);

@@ -4,12 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Sequence } from "@prisma/client";
 
-export default function SequenceActions({ sequence }: { sequence: Sequence }) {
+export default function SequenceActions({
+  sequence,
+  pendingCount = 0,
+}: {
+  sequence: Sequence;
+  pendingCount?: number;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function toggleActive() {
+  async function togglePaused() {
     setBusy(true);
     setError(null);
     const res = await fetch(`/api/sequences/${sequence.id}`, {
@@ -19,7 +25,27 @@ export default function SequenceActions({ sequence }: { sequence: Sequence }) {
     });
     setBusy(false);
     if (!res.ok) {
-      setError("Failed to update sequence");
+      setError("Couldn't change the sequence. Try again.");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function handleStop() {
+    if (
+      !confirm(
+        `Stop "${sequence.name}"? This cancels ${pendingCount} scheduled ` +
+          `${pendingCount === 1 ? "email" : "emails"} permanently. ` +
+          `To hold them instead, use Pause.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    const res = await fetch(`/api/sequences/${sequence.id}/stop`, { method: "POST" });
+    setBusy(false);
+    if (!res.ok) {
+      setError("Couldn't stop the sequence. Try again.");
       return;
     }
     router.refresh();
@@ -45,13 +71,28 @@ export default function SequenceActions({ sequence }: { sequence: Sequence }) {
           {error}
         </div>
       )}
+      {!sequence.isActive && pendingCount > 0 && (
+        <div className="rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200 px-3 py-2 text-sm">
+          Paused — {pendingCount} scheduled{" "}
+          {pendingCount === 1 ? "email is" : "emails are"} being held. Resume to
+          send them, or Stop to cancel them.
+        </div>
+      )}
       <div className="flex gap-2">
         <button
-          onClick={toggleActive}
+          onClick={togglePaused}
           disabled={busy}
           className="rounded-md border border-black/10 dark:border-white/10 px-3 py-1.5 text-sm font-medium hover:bg-black/[.04] dark:hover:bg-white/[.06] disabled:opacity-50"
         >
-          {sequence.isActive ? "Deactivate" : "Activate"}
+          {sequence.isActive ? "Pause" : "Resume"}
+        </button>
+        <button
+          onClick={handleStop}
+          disabled={busy || pendingCount === 0}
+          title={pendingCount === 0 ? "Nothing scheduled to cancel" : undefined}
+          className="rounded-md border border-black/10 dark:border-white/10 px-3 py-1.5 text-sm font-medium hover:bg-black/[.04] dark:hover:bg-white/[.06] disabled:opacity-50"
+        >
+          Stop
         </button>
         <button
           onClick={handleDelete}
