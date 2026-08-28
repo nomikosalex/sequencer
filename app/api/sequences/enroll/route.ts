@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { renderTemplate } from "@/lib/variables";
+import { nthSendingSlot } from "@/lib/schedule";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { sequenceId, contactIds } = body as {
+  const { sequenceId, contactIds, perDay } = body as {
     sequenceId?: string;
     contactIds?: string[];
+    // How many of these contacts may start per sending day. Omit to start
+    // them all at once, which is the historical behaviour.
+    perDay?: number;
   };
+
+  if (perDay !== undefined && (!Number.isInteger(perDay) || perDay < 1)) {
+    return NextResponse.json(
+      { error: "perDay must be a positive integer" },
+      { status: 400 }
+    );
+  }
 
   if (!sequenceId || !Array.isArray(contactIds) || contactIds.length === 0) {
     return NextResponse.json(
@@ -54,6 +65,7 @@ export async function POST(request: NextRequest) {
 
   let enrolled = 0;
   const skipped: { contactId: string; reason: string }[] = [];
+  const scheduled: { contactId: string; startAt: string }[] = [];
   const now = Date.now();
 
   for (const contactId of contactIds) {
@@ -74,10 +86,18 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
+    // With perDay set, contacts start on staggered sending days rather than
+    // all becoming due at once: the Nth contact waits for the (N / perDay)th
+    // sending day, computed in that contact's own timezone and skipping
+    // non-sending days. Follow-up steps then space out from that start.
+    const startAt = perDay
+      ? nthSendingSlot(new Date(now), Math.floor(enrolled / perDay), contact.timezone)
+      : new Date(now);
+
     let cumulativeDays = 0;
     const stepsData = sequence.templates.map((t) => {
       cumulativeDays += t.delayDays;
-      const sendAt = new Date(now + cumulativeDays * 24 * 60 * 60 * 1000);
+      const sendAt = new Date(startAt.getTime() + cumulativeDays * 24 * 60 * 60 * 1000);
       return {
         contactId,
         sequenceId,
@@ -89,8 +109,9 @@ export async function POST(request: NextRequest) {
     });
 
     await prisma.sequenceStep.createMany({ data: stepsData });
+    scheduled.push({ contactId, startAt: startAt.toISOString() });
     enrolled++;
   }
 
-  return NextResponse.json({ enrolled, skipped });
+  return NextResponse.json({ enrolled, skipped, scheduled });
 }

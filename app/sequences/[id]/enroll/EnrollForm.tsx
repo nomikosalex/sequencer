@@ -22,6 +22,9 @@ export default function EnrollForm({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // 0 means "start everyone at once"; anything else drips them across
+  // sending days.
+  const [perDay, setPerDay] = useState(0);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -46,7 +49,11 @@ export default function EnrollForm({
     const res = await fetch("/api/sequences/enroll", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sequenceId, contactIds: Array.from(selected) }),
+      body: JSON.stringify({
+        sequenceId,
+        contactIds: Array.from(selected),
+        ...(perDay > 0 ? { perDay } : {}),
+      }),
     });
 
     setSubmitting(false);
@@ -116,6 +123,30 @@ export default function EnrollForm({
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border border-black/10 dark:border-white/10 p-4">
+        <label className="text-sm font-medium" htmlFor="perDay">
+          Start per day
+        </label>
+        <div className="flex items-center gap-3">
+          <select
+            id="perDay"
+            value={perDay}
+            onChange={(e) => setPerDay(Number(e.target.value))}
+            className="rounded-md border border-black/10 dark:border-white/10 bg-transparent px-3 py-1.5 text-sm"
+          >
+            <option value={0}>All at once</option>
+            {[1, 2, 3, 5].map((n) => (
+              <option key={n} value={n}>{n} per day</option>
+            ))}
+          </select>
+          <span className="text-sm text-foreground/60">
+            {perDay === 0
+              ? "Everyone becomes due immediately, subject to the daily cap."
+              : `${selected.size || 0} contacts spread over ~${Math.ceil((selected.size || 0) / perDay)} sending days. Sundays are skipped.`}
+          </span>
+        </div>
       </div>
 
       <div className="flex gap-2">

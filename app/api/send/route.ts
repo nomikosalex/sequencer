@@ -4,6 +4,7 @@ import { sendEmail } from "@/lib/mailgun";
 import { logStepSentToHubspot, setPipelineStage } from "@/lib/hubspotSync";
 import { isSendingPaused } from "@/lib/sequenceControl";
 import { isInSendWindow } from "@/lib/timezone";
+import { isSendingDay } from "@/lib/schedule";
 
 // Hobby plan's default/max function duration with fluid compute. Set explicitly
 // (rather than relying on the platform default) so the jitter/time-budget logic
@@ -63,10 +64,12 @@ export async function GET(request: NextRequest) {
     include: { contact: true },
   });
 
-  // Outside their local morning, steps stay pending and untouched for a later
-  // hourly run — no state change, nothing to unwind.
-  const pendingSteps = dueSteps.filter((step) =>
-    isInSendWindow(now, step.contact.timezone)
+  // Outside their local morning, or on a day we don't send (Sunday by
+  // default), steps stay pending and untouched for a later run: no state
+  // change, nothing to unwind. Both checks use the recipient's calendar, not
+  // ours, so a Sunday in Athens does not silently block New York.
+  const pendingSteps = dueSteps.filter(
+    (step) => isInSendWindow(now, step.contact.timezone) && isSendingDay(now, step.contact.timezone)
   );
   const outsideWindow = dueSteps.length - pendingSteps.length;
 
