@@ -19,7 +19,7 @@ export default async function Home() {
     totalContacts,
     activeSequences,
     sentCount,
-    openedCount,
+    bouncedCount,
     repliedCount,
     kanbanContacts,
     recentSteps,
@@ -28,7 +28,7 @@ export default async function Home() {
     prisma.contact.count(),
     prisma.sequence.count({ where: { isActive: true } }),
     prisma.sequenceStep.count({ where: { sentAt: { not: null } } }),
-    prisma.sequenceStep.count({ where: { openedAt: { not: null } } }),
+    prisma.sequenceStep.count({ where: { status: "failed" } }),
     prisma.sequenceStep.count({ where: { status: "replied" } }),
     prisma.contact.findMany({
       select: { id: true, name: true, company: true, leadScore: true, pipelineStage: true },
@@ -49,14 +49,24 @@ export default async function Home() {
     }),
   ]);
 
-  const openRate = sentCount > 0 ? Math.round((openedCount / sentCount) * 100) : 0;
+  // Open rate is deliberately absent. Messages are sent as plain text, and
+  // Mailgun's open tracking needs an HTML pixel — so that number could only
+  // ever read 0%, which is worse than not showing it. Bounce rate is the one
+  // that actually threatens the domain, so it takes the slot.
+  const attempted = sentCount + bouncedCount;
+  const bounceRate = attempted > 0 ? Math.round((bouncedCount / attempted) * 1000) / 10 : 0;
   const replyRate = sentCount > 0 ? Math.round((repliedCount / sentCount) * 100) : 0;
 
   const stats = [
     { label: "Total contacts", value: totalContacts },
     { label: "Active sequences", value: activeSequences },
     { label: "Emails sent", value: sentCount },
-    { label: "Open rate", value: `${openRate}%` },
+    {
+      label: "Bounce rate",
+      value: `${bounceRate}%`,
+      // Under 2% is healthy; past 3% the domain's reputation is at stake.
+      tone: bounceRate >= 3 ? "bad" : bounceRate >= 2 ? "warn" : undefined,
+    },
     { label: "Reply rate", value: `${replyRate}%` },
   ];
 
@@ -75,7 +85,17 @@ export default async function Home() {
             key={stat.label}
             className="rounded-lg border border-black/10 dark:border-white/10 px-4 py-3"
           >
-            <div className="text-2xl font-semibold">{stat.value}</div>
+            <div
+              className={
+                stat.tone === "bad"
+                  ? "text-2xl font-semibold text-red-600 dark:text-red-400"
+                  : stat.tone === "warn"
+                    ? "text-2xl font-semibold text-amber-600 dark:text-amber-400"
+                    : "text-2xl font-semibold"
+              }
+            >
+              {stat.value}
+            </div>
             <div className="text-sm text-foreground/60">{stat.label}</div>
           </div>
         ))}
