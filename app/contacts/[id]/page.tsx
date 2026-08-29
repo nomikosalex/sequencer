@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_TIMEZONE } from "@/lib/timezone";
 import ContactActions from "./ContactActions";
+import StepSchedule from "./StepSchedule";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +63,26 @@ export default async function ContactDetailPage({
                   <span className="text-foreground/60">{step.status}</span>
                 </div>
                 <div className="text-foreground/60">{step.subject}</div>
+                {step.status === "pending" ? (
+                  <StepSchedule
+                    stepId={step.id}
+                    timeZone={contact.timezone || DEFAULT_TIMEZONE}
+                    localDate={new Intl.DateTimeFormat("en-CA", {
+                      timeZone: contact.timezone || DEFAULT_TIMEZONE,
+                    }).format(step.sendAt)}
+                  />
+                ) : (
+                  step.sentAt && (
+                    <div className="mt-1 text-xs text-foreground/50">
+                      Sent{" "}
+                      {new Intl.DateTimeFormat("en-GB", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: contact.timezone || DEFAULT_TIMEZONE,
+                      }).format(step.sentAt)}
+                    </div>
+                  )
+                )}
               </li>
             ))}
           </ul>
