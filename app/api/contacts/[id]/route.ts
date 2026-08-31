@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { setPipelineStage, PIPELINE_STAGES, type PipelineStage } from "@/lib/hubspotSync";
+import { skipRemainingSteps } from "@/lib/sequenceControl";
 
 export async function GET(
   _request: NextRequest,
@@ -58,6 +59,22 @@ export async function PATCH(
 
     if (pipelineStage !== undefined) {
       await setPipelineStage(id, pipelineStage as PipelineStage);
+
+      // Moving someone to "replied" — by dragging the kanban card or from the
+      // contact page — has to stop their run, not just relabel it. Mailgun
+      // cannot detect the reply for us: inbound mail for this domain goes to
+      // the registrar's forwarding, never to Mailgun, so no `replied` webhook
+      // will ever fire and this manual move is the only signal there is. Left
+      // as a label alone, the next step would still send to someone who had
+      // already written back.
+      if (pipelineStage === "replied") {
+        const skipped = await skipRemainingSteps(id);
+        await prisma.contact.update({
+          where: { id },
+          data: { status: "replied" },
+        });
+        console.log(`contact ${id} marked replied; ${skipped} pending step(s) skipped`);
+      }
     }
 
     return NextResponse.json(contact);

@@ -1,4 +1,4 @@
-import { DEFAULT_TIMEZONE, SEND_WINDOW_START } from "@/lib/timezone";
+import { DEFAULT_TIMEZONE, SEND_WINDOW_START, isInSendWindow } from "@/lib/timezone";
 
 // Which weekdays outreach may go out on, in the *recipient's* local calendar:
 // 0 = Sunday ... 6 = Saturday. Sunday is excluded by default because a cold
@@ -91,4 +91,30 @@ export function nthSendingSlot(from: Date, index: number, timeZone: string | nul
     cursor = new Date(cursor.getTime() + 24 * 3600_000);
   }
   throw new Error("no sending day found; check SENDING_DAYS");
+}
+
+// The hours at which Vercel actually invokes /api/send, mirroring vercel.json.
+// A step becomes due at `sendAt`, but it only *ships* at the first cron that
+// lands inside the recipient's morning window on a sending day — which can be
+// the next day, or, before the 03:00 slot existed, never. Showing raw `sendAt`
+// in the UI implied SigNoz would go out at 19:30 in Kolkata; it will not.
+const CRON_HOURS_UTC = [3, 5, 7, 12, 15];
+
+/** When a queued step will actually be sent, or null if no slot fits. */
+export function nextSendSlot(
+  sendAt: Date,
+  timezone: string | null,
+  from: Date = new Date()
+): Date | null {
+  const start = sendAt > from ? sendAt : from;
+  for (let day = 0; day < 14; day++) {
+    for (const hour of CRON_HOURS_UTC) {
+      const t = new Date(Date.UTC(
+        start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + day, hour, 0, 0
+      ));
+      if (t < start) continue;
+      if (isInSendWindow(t, timezone) && isSendingDay(t, timezone)) return t;
+    }
+  }
+  return null;
 }
