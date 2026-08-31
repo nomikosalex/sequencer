@@ -21,7 +21,12 @@ const TIME_BUDGET_MS = 270_000;
 // this existed the ceiling was ~15/run purely because TIME_BUDGET_MS divided by
 // average jitter happened to land there — enrolling 100 contacts would have
 // drained them as fast as the function allowed.
-const DAILY_SEND_LIMIT = 10;
+// Four, not ten. The domain's own history is the constraint: 4 emails over 3
+// days, so ~1.3/day. A queue that suddenly puts 8 through in one morning is a
+// 6x jump on a thin-history domain with no positive engagement to offset it —
+// and reputation systems weigh the *change* in rate, not just the level. Eight
+// a day is trivial in absolute terms; going to eight from one is not.
+const DAILY_SEND_LIMIT = 4;
 // This route is polled hourly, so cap each run too: ten messages leaving in one
 // burst at 07:00 is a machine signature, three an hour across the morning is a
 // person working through their inbox.

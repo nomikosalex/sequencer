@@ -98,7 +98,7 @@ export function nthSendingSlot(from: Date, index: number, timeZone: string | nul
 // lands inside the recipient's morning window on a sending day — which can be
 // the next day, or, before the 03:00 slot existed, never. Showing raw `sendAt`
 // in the UI implied SigNoz would go out at 19:30 in Kolkata; it will not.
-const CRON_HOURS_UTC = [3, 5, 7, 12, 15];
+const CRON_HOURS_UTC = [3, 5, 7, 12, 15, 16];
 
 /** When a queued step will actually be sent, or null if no slot fits. */
 export function nextSendSlot(
