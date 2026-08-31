@@ -31,8 +31,11 @@ async function main() {
   const write = process.argv.includes("--confirm");
   const steps = await prisma.sequenceStep.findMany({
     where: { status: "pending" },
-    include: { contact: { select: { company: true, timezone: true } } },
-    orderBy: { sendAt: "asc" },
+    include: { contact: { select: { company: true, timezone: true, leadScore: true } } },
+    // Lead score first: spreading by date alone pushed the best-fit target
+    // (Unikraft, 99) to the third day behind weaker ones that happened to be
+    // enrolled earlier. The queue should drain in the order the targets matter.
+    orderBy: [{ contact: { leadScore: "desc" } }, { sendAt: "asc" }],
   });
 
   // Deal round-robin across timezones so each day gets a mix, not a cluster
@@ -44,6 +47,7 @@ async function main() {
     byZone.get(z)!.push(s);
   }
   const queues = [...byZone.values()];
+  for (const q of queues) q.sort((a, b) => b.contact.leadScore - a.contact.leadScore);
   const dealt: typeof steps = [];
   while (dealt.length < steps.length) {
     for (const q of queues) {
